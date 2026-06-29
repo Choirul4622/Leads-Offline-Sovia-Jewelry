@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Rekapitulasi Kunjungan</title>
+    <meta name="description" content="Aplikasi rekapitulasi kunjungan store dengan kapabilitas offline.">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons (Lucide) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Offline Indicator -->
+    <div id="offline-badge" class="offline-badge hidden">
+        <i data-lucide="wifi-off"></i> Offline Mode
+    </div>
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen active">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo-box">
+                    <i data-lucide="bar-chart-3"></i>
+                </div>
+                <h1>Store Visit System</h1>
+                <p>Silakan login untuk melanjutkan</p>
+            </div>
+            <form id="login-form">
+                <div class="input-group">
+                    <label for="username">Username</label>
+                    <div class="input-wrapper">
+                        <i data-lucide="user"></i>
+                        <input type="text" id="username" required autocomplete="username">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <div class="input-wrapper">
+                        <i data-lucide="lock"></i>
+                        <input type="password" id="password" required autocomplete="current-password">
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary" id="btn-login">
+                    <span>Masuk</span>
+                    <i data-lucide="arrow-right"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App Layout -->
+    <div id="app-screen" class="screen hidden">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-box small">
+                    <i data-lucide="bar-chart-3"></i>
+                </div>
+                <h2>Rekap Kunjungan</h2>
+                <button id="close-sidebar" class="btn-icon mobile-only">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            
+            <div class="user-info">
+                <div class="avatar"><i data-lucide="user"></i></div>
+                <div class="user-details">
+                    <span id="active-user-name">Nama User</span>
+                    <span id="active-store-badge" class="badge">Store A</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#dashboard" class="nav-item active" data-target="dashboard">
+                    <i data-lucide="layout-dashboard"></i> Dashboard
+                </a>
+                <a href="#form-kunjungan" class="nav-item" data-target="form-kunjungan">
+                    <i data-lucide="file-plus"></i> Form Kunjungan
+                </a>
+                <a href="#laporan" class="nav-item" data-target="laporan">
+                    <i data-lucide="pie-chart"></i> Laporan Analitik
+                </a>
+                
+                <div class="nav-divider admin-only"></div>
+                <div class="nav-section-title admin-only">Admin Area</div>
+                
+                <a href="#validasi" class="nav-item admin-only" data-target="validasi">
+                    <i data-lucide="check-circle"></i> Validasi Target
+                </a>
+                <a href="#manajemen-user" class="nav-item admin-only" data-target="manajemen-user">
+                    <i data-lucide="users"></i> Manajemen User
+                </a>
+                <a href="#sinkronisasi" class="nav-item admin-only" data-target="sinkronisasi">
+                    <i data-lucide="refresh-cw"></i> Data Sinkronisasi
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="btn-logout" class="btn-outline">
+                    <i data-lucide="log-out"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <button id="open-sidebar" class="btn-icon mobile-only">
+                    <i data-lucide="menu"></i>
+                </button>
+                <h2 id="current-page-title">Dashboard</h2>
+                <div class="header-actions">
+                    <div id="sync-status" class="sync-status" title="Sync Status">
+                        <i data-lucide="check-circle-2" class="status-icon"></i>
+                        <span class="status-text">Tersinkronisasi</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="panel-container">
+                <!-- Dashboard Panel -->
+                <section id="panel-dashboard" class="panel active">
+                    <div class="kpi-grid">
+                        <div class="kpi-card glass">
+                            <div class="kpi-icon blue"><i data-lucide="users"></i></div>
+                            <div class="kpi-info">
+                                <h3>Total Visit Baru</h3>
+                                <div class="kpi-value" id="kpi-visit-baru">0</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card glass">
+                            <div class="kpi-icon green"><i data-lucide="check-square"></i></div>
+                            <div class="kpi-info">
+                                <h3>Total Deals</h3>
+                                <div class="kpi-value" id="kpi-total-deals">0</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card glass">
+                            <div class="kpi-icon purple"><i data-lucide="trending-up"></i></div>
+                            <div class="kpi-info">
+                                <h3>Konversi Deals</h3>
+                                <div class="kpi-value" id="kpi-konversi-deals">0%</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card glass">
+                            <div class="kpi-icon orange"><i data-lucide="dollar-sign"></i></div>
+                            <div class="kpi-info">
+                                <h3>Omset Penjualan</h3>
+                                <div class="kpi-value" id="kpi-omset">Rp 0</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card glass">
+                            <div class="kpi-icon red"><i data-lucide="target"></i></div>
+                            <div class="kpi-info">
+                                <h3>Konversi Omset</h3>
+                                <div class="kpi-value" id="kpi-konversi-omset">0%</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="recent-visits glass mt-6">
+                        <div class="section-header flex-between">
+                            <h3>Kunjungan Terbaru</h3>
+                            <button id="btn-refresh-dashboard" class="btn-icon" title="Refresh Data">
+                                <i data-lucide="refresh-cw"></i>
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Waktu</th>
+                                        <th>Store</th>
+                                        <th>Visit Baru</th>
+                                        <th>Total Deals</th>
+                                        <th>Omset</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-visits-body">
+                                    <tr><td colspan="5" class="text-center text-muted">Belum ada data</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Form Kunjungan Panel -->
+                <section id="panel-form-kunjungan" class="panel hidden">
+                    <form id="visit-form" class="glass form-layout">
+                        <div class="form-header">
+                            <h3>Input Data Kunjungan Harian</h3>
+                            <p>Data akan tersimpan secara lokal jika offline, dan otomatis dikirim saat online.</p>
+                        </div>
+
+                        <div class="form-grid">
+                            <!-- Group 1: Visit & Deals -->
+                            <div class="form-section">
+                                <h4>Kunjungan & Deals</h4>
+                                <div class="input-group">
+                                    <label for="visit-baru">Visit Baru</label>
+                                    <input type="number" id="visit-baru" min="0" required value="0">
+                                </div>
+                                <div class="input-group">
+                                    <label for="deals-offline">Deals Offline</label>
+                                    <input type="number" id="deals-offline" min="0" required value="0">
+                                </div>
+                                <div class="input-group">
+                                    <label for="deals-referal">Deals Referal</label>
+                                    <input type="number" id="deals-referal" min="0" required value="0">
+                                </div>
+                                <div class="input-group">
+                                    <label for="deals-box">Deals Box</label>
+                                    <input type="number" id="deals-box" min="0" required value="0">
+                                </div>
+                                <div class="calculated-group">
+                                    <div class="calc-item">
+                                        <span class="calc-label">Total Deals</span>
+                                        <span class="calc-value highlight" id="calc-total-deals">0</span>
+                                    </div>
+                                    <div class="calc-item">
+                                        <span class="calc-label">Konversi Deals</span>
+                                        <span class="calc-value highlight" id="calc-konversi-deals">0%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Group 2: Lanjutan & Operasional -->
+                            <div class="form-section">
+                                <h4>Layanan Lanjutan</h4>
+                                <div class="input-group">
+                                    <label for="visit-repair">Visit Repair</label>
+                                    <input type="number" id="visit-repair" min="0" required value="0">
+                                </div>
+                                <div class="input-group">
+                                    <label for="visit-buyback">Visit Buyback</label>
+                                    <input type="number" id="visit-buyback" min="0" required value="0">
+                                </div>
+                                <div class="input-group">
+                                    <label for="pengambilan-baru">Pengambilan Order Baru</label>
+                                    <input type="number" id="pengambilan-baru" min="0" required value="0">
+                                </div>
+                                <div class="input-group">
+                                    <label for="pengambilan-repair">Pengambilan Repair</label>
+                                    <input type="number" id="pengambilan-repair" min="0" required value="0">
+                                </div>
+                            </div>
+
+                            <!-- Group 3: Penjualan -->
+                            <div class="form-section">
+                                <h4>Penjualan</h4>
+                                <div class="input-group">
+                                    <label for="qty-cincin">Qty Cincin Terjual</label>
+                                    <input type="number" id="qty-cincin" min="0" required value="0">
+                                </div>
+                                <div class="input-group">
+                                    <label for="omset">Omset Penjualan (Rp)</label>
+                                    <input type="number" id="omset" min="0" required value="0">
+                                </div>
+                                <div class="calculated-group">
+                                    <div class="calc-item">
+                                        <span class="calc-label">Target Store (<span id="label-store-name"></span>)</span>
+                                        <span class="calc-value" id="calc-target-omset">Rp 0</span>
+                                    </div>
+                                    <div class="calc-item">
+                                        <span class="calc-label">Konversi Omset</span>
+                                        <span class="calc-value highlight" id="calc-konversi-omset">0%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary large">
+                                <i data-lucide="save"></i> Simpan Data Kunjungan
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- Laporan Panel -->
+                <section id="panel-laporan" class="panel hidden">
+                    <div class="glass">
+                        <div class="section-header">
+                            <h3>Laporan Analitik</h3>
+                            <p class="text-muted">Fitur visualisasi grafik akan hadir di pembaruan selanjutnya.</p>
+                        </div>
+                        <div class="chart-container" style="height: 300px; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--border-color); border-radius: 8px;">
+                            <span class="text-muted"><i data-lucide="bar-chart-2" style="width: 48px; height: 48px; margin-bottom: 12px; display: block; margin: 0 auto;"></i> Mode Laporan</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Validasi (Admin) Panel -->
+                <section id="panel-validasi" class="panel hidden">
+                    <div class="glass form-layout">
+                        <div class="section-header">
+                            <h3>Pengaturan Target Store</h3>
+                            <p>Konfigurasi target omzet bulanan untuk kalkulasi konversi otomatis.</p>
+                        </div>
+                        <form id="store-target-form" class="mt-4">
+                            <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                                <div class="input-group">
+                                    <label for="store-name-config">Nama Store</label>
+                                    <input type="text" id="store-name-config" required placeholder="Contoh: Store Jakarta">
+                                </div>
+                                <div class="input-group">
+                                    <label for="store-target-config">Target Omzet (Rp)</label>
+                                    <input type="number" id="store-target-config" required placeholder="100000000">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary mt-2">Simpan Target</button>
+                        </form>
+                        
+                        <div class="mt-8">
+                            <div class="flex-between mb-4">
+                                <h4>Daftar Target Store</h4>
+                                <button id="btn-refresh-stores" class="btn-icon" title="Refresh">
+                                    <i data-lucide="refresh-cw"></i>
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Store</th>
+                                            <th>Target Omzet</th>
+                                            <th>Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="stores-list-body">
+                                        <!-- Dynamic content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Manajemen User Panel -->
+                <section id="panel-manajemen-user" class="panel hidden">
+                    <div class="glass form-layout">
+                        <div class="section-header">
+                            <h3>Manajemen User</h3>
+                        </div>
+                        <form id="user-form" class="mt-4">
+                            <div class="form-grid">
+                                <div class="input-group">
+                                    <label for="new-username">Username</label>
+                                    <input type="text" id="new-username" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="new-password">Password</label>
+                                    <input type="text" id="new-password" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="new-role">Role</label>
+                                    <select id="new-role" required>
+                                        <option value="Store">Store</option>
+                                        <option value="Admin">Admin</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="new-store-assign">Assign ke Store</label>
+                                    <select id="new-store-assign" required>
+                                        <option value="">-- Pilih Store --</option>
+                                        <!-- Dynamic -->
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary mt-4">Simpan User</button>
+                        </form>
+
+                        <div class="mt-8">
+                            <div class="flex-between mb-4">
+                                <h4>Daftar User</h4>
+                                <button id="btn-refresh-users" class="btn-icon" title="Refresh">
+                                    <i data-lucide="refresh-cw"></i>
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Username</th>
+                                            <th>Role</th>
+                                            <th>Store</th>
+                                            <th>Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="users-list-body">
+                                        <!-- Dynamic content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                 <!-- Data Sinkronisasi Panel -->
+                 <section id="panel-sinkronisasi" class="panel hidden">
+                    <div class="glass">
+                        <div class="section-header flex-between items-center">
+                            <div>
+                                <h3>Antrean Sinkronisasi (Sync Queue)</h3>
+                                <p class="text-muted">Data yang tersimpan di lokal (karena offline) dan menunggu dikirim ke server.</p>
+                            </div>
+                            <button id="btn-force-sync" class="btn-outline">
+                                <i data-lucide="refresh-cw"></i> Paksa Sinkronisasi
+                            </button>
+                        </div>
+                        
+                        <div class="table-responsive mt-4">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Waktu Input</th>
+                                        <th>Tipe Data</th>
+                                        <th>Detail</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sync-queue-body">
+                                    <tr><td colspan="4" class="text-center text-muted">Antrean kosong</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="overlay hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/db.js"></script>
+    <script src="js/sync.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>
