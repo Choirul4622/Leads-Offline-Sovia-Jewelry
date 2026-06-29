@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (myVisits.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Belum ada data kunjungan</td></tr>';
         } else {
-            // Sort by timestamp desc (assuming id or timestamp exists)
+            // Sort by timestamp desc
             const sorted = myVisits.sort((a,b) => new Date(b.timestamp || b.id) - new Date(a.timestamp || a.id)).slice(0, 5);
             sorted.forEach(v => {
                 const tr = document.createElement('tr');
@@ -299,7 +299,115 @@ document.addEventListener('DOMContentLoaded', async () => {
                 tbody.appendChild(tr);
             });
         }
+        
+        // Render Charts after loading data
+        renderCharts(myVisits);
     }
+    
+    // --- CHARTS LOGIC ---
+    let chartVisits, chartOmset;
+    function renderCharts(visits) {
+        if (!window.Chart) return;
+        
+        // Group data by Store (for Admin) or by Date (for Store)
+        const isStore = appState.session.role === 'Store';
+        
+        const labels = [];
+        const visitData = [];
+        const dealData = [];
+        const omsetData = [];
+        
+        if (isStore) {
+            // Group by Date
+            const grouped = {};
+            visits.forEach(v => {
+                const date = new Date(v.timestamp || parseInt(v.id)).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'});
+                if(!grouped[date]) grouped[date] = { visit: 0, deals: 0, omset: 0 };
+                grouped[date].visit += parseInt(v.visitBaru) || 0;
+                grouped[date].deals += parseInt(v.totalDeals) || 0;
+                grouped[date].omset += parseInt(v.omset) || 0;
+            });
+            Object.keys(grouped).slice(-7).forEach(date => { // Last 7 entries
+                labels.push(date);
+                visitData.push(grouped[date].visit);
+                dealData.push(grouped[date].deals);
+                omsetData.push(grouped[date].omset);
+            });
+        } else {
+            // Group by Store
+            const grouped = {};
+            visits.forEach(v => {
+                const store = v.storeName;
+                if(!grouped[store]) grouped[store] = { visit: 0, deals: 0, omset: 0 };
+                grouped[store].visit += parseInt(v.visitBaru) || 0;
+                grouped[store].deals += parseInt(v.totalDeals) || 0;
+                grouped[store].omset += parseInt(v.omset) || 0;
+            });
+            Object.keys(grouped).forEach(store => {
+                labels.push(store);
+                visitData.push(grouped[store].visit);
+                dealData.push(grouped[store].deals);
+                omsetData.push(grouped[store].omset);
+            });
+        }
+
+        // Chart 1: Visit vs Deals (Bar)
+        const ctxVisits = document.getElementById('chart-visits');
+        if (ctxVisits) {
+            if (chartVisits) chartVisits.destroy();
+            chartVisits = new Chart(ctxVisits, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Visit Baru', data: visitData, backgroundColor: 'rgba(59, 130, 246, 0.8)' },
+                        { label: 'Total Deals', data: dealData, backgroundColor: 'rgba(16, 185, 129, 0.8)' }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#f8fafc' } } },
+                    scales: {
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Chart 2: Omset (Line)
+        const ctxOmset = document.getElementById('chart-omset');
+        if (ctxOmset) {
+            if (chartOmset) chartOmset.destroy();
+            chartOmset = new Chart(ctxOmset, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Omset Penjualan (Rp)',
+                        data: omsetData,
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#f8fafc' } } },
+                    scales: {
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+                    }
+                }
+            });
+        }
+    }
+    
+    document.getElementById('btn-refresh-charts').addEventListener('click', () => {
+        loadDashboardData();
+        showToast('Grafik diperbarui', 'info');
+    });
 
     document.getElementById('btn-refresh-dashboard').addEventListener('click', () => {
         loadDashboardData();
@@ -442,11 +550,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             tr.innerHTML = `
                 <td>${t.storeName}</td>
                 <td>${formatCurrency(t.target)}</td>
-                <td><button class="btn-icon text-muted" title="Fitur hapus belum tersedia di UI"><i data-lucide="trash-2"></i></button></td>
+                <td><button class="btn-icon text-muted btn-delete-store" data-store="${t.storeName}" title="Hapus"><i data-lucide="trash-2"></i></button></td>
             `;
             tbody.appendChild(tr);
         });
         if (window.lucide) lucide.createIcons();
+        
+        // Setup Delete Target Event
+        document.querySelectorAll('.btn-delete-store').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const sName = e.currentTarget.getAttribute('data-store');
+                if(confirm(`Yakin ingin menghapus target untuk ${sName}?`)) {
+                    await window.AppDB.addToSyncQueue('deleteStoreTarget', { storeName: sName });
+                    await window.AppDB.delete(window.AppDB.STORES.STORE_TARGETS, sName);
+                    loadStoreTargetsUI();
+                    if (window.SyncManager.isOnline) window.SyncManager.syncNow();
+                }
+            });
+        });
         
         // Also populate user management dropdown
         const select = document.getElementById('new-store-assign');
@@ -456,6 +577,85 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
     document.getElementById('btn-refresh-stores').addEventListener('click', loadStoreTargetsUI);
+
+    // --- USER MANAGEMENT ---
+    elements.forms.user.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('new-username').value.trim();
+        const password = document.getElementById('new-password').value.trim();
+        const role = document.getElementById('new-role').value;
+        const storeName = document.getElementById('new-store-assign').value;
+
+        const payload = { id: 'U-'+Date.now(), username, password, role, storeName };
+        await window.AppDB.addToSyncQueue('saveUser', payload);
+        
+        await window.AppDB.put(window.AppDB.STORES.USERS, payload);
+        loadUsersUI();
+        showToast('User ditambahkan ke antrean simpan', 'success');
+        
+        if (window.SyncManager.isOnline) window.SyncManager.syncNow();
+        elements.forms.user.reset();
+    });
+
+    async function loadUsersUI() {
+        const users = await window.AppDB.getAll(window.AppDB.STORES.USERS);
+        const tbody = document.getElementById('users-list-body');
+        tbody.innerHTML = '';
+        
+        if (users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Belum ada data user</td></tr>';
+            return;
+        }
+
+        users.forEach(u => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${u.username}</td>
+                <td><span class="badge">${u.role}</span></td>
+                <td>${u.storeName}</td>
+                <td><button class="btn-icon text-muted btn-delete-user" data-user="${u.username}" title="Hapus"><i data-lucide="trash-2"></i></button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+        if (window.lucide) lucide.createIcons();
+        
+        document.querySelectorAll('.btn-delete-user').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const uName = e.currentTarget.getAttribute('data-user');
+                if(uName === 'admin') {
+                    showToast('Admin default tidak bisa dihapus dari UI', 'error');
+                    return;
+                }
+                if(confirm(`Yakin ingin menghapus user ${uName}?`)) {
+                    await window.AppDB.addToSyncQueue('deleteUser', { username: uName });
+                    await window.AppDB.delete(window.AppDB.STORES.USERS, uName);
+                    loadUsersUI();
+                    if (window.SyncManager.isOnline) window.SyncManager.syncNow();
+                }
+            });
+        });
+    }
+    
+    document.getElementById('btn-refresh-users').addEventListener('click', async () => {
+        if (window.SyncManager.isOnline) {
+            await window.SyncManager.fetchInitialData();
+            loadUsersUI();
+            showToast('Data user diperbarui', 'info');
+        } else {
+            showToast('Harus online untuk menyinkronkan user', 'error');
+        }
+    });
+
+    // Make functions globally available for navigation triggers
+    window.app.loadUsersUI = loadUsersUI;
+
+    // Inside Navigation Listener, hook up loadUsersUI
+    elements.sidebar.navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            // ... (existing listener logic handles this via ID checking)
+            if (item.getAttribute('data-target') === 'manajemen-user') loadUsersUI();
+        });
+    });
 
     // Initial load
     checkAuth();
