@@ -124,6 +124,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
+    // Fetch initial data in background immediately if online, so users cache is ready
+    if (window.SyncManager.isOnline) {
+        window.SyncManager.fetchInitialData().catch(e => console.error("Background fetch failed", e));
+    }
+
     // Login Submission
     elements.forms.login.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -138,10 +143,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             let user = null;
             
             // Try fetching from local cache first
-            const cachedUser = await window.AppDB.get(window.AppDB.STORES.USERS, username);
+            let cachedUser = await window.AppDB.get(window.AppDB.STORES.USERS, username);
+            
+            // Jika tidak ada di lokal tapi sedang online, coba tarik data terbaru dari server
+            if (!cachedUser && window.SyncManager.isOnline) {
+                await window.SyncManager.fetchInitialData();
+                cachedUser = await window.AppDB.get(window.AppDB.STORES.USERS, username);
+            }
+
             if (cachedUser && cachedUser.password === password) {
                 user = cachedUser;
-            } else if (username === 'admin' && password === 'admin') {
+            } else if (username === 'admin' && password === 'admin123') {
                 user = { username: 'admin', role: 'Admin', storeName: 'Semua Store' };
             } else if (username === 'store1' && password === 'store1') {
                 user = { username: 'store1', role: 'Store', storeName: 'Store Jakarta' };
