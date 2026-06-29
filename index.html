@@ -17,6 +17,9 @@
     
     <!-- Icons (Lucide) -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- CSS -->
     <link rel="stylesheet" href="./css/style.css">
@@ -291,13 +294,33 @@
 
                 <!-- Laporan Panel -->
                 <section id="panel-laporan" class="panel hidden">
-                    <div class="glass">
-                        <div class="section-header">
-                            <h3>Laporan Analitik</h3>
-                            <p class="text-muted">Fitur visualisasi grafik akan hadir di pembaruan selanjutnya.</p>
+                    <div class="glass form-layout">
+                        <div class="section-header flex-between mb-4">
+                            <div>
+                                <h3>Laporan Analitik</h3>
+                                <p class="text-muted">Visualisasi data performa berdasarkan riwayat kunjungan.</p>
+                            </div>
+                            <button id="btn-refresh-charts" class="btn-icon" title="Refresh Grafik">
+                                <i data-lucide="refresh-cw"></i>
+                            </button>
                         </div>
-                        <div class="chart-container" style="height: 300px; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--border-color); border-radius: 8px;">
-                            <span class="text-muted"><i data-lucide="bar-chart-2" style="width: 48px; height: 48px; margin-bottom: 12px; display: block; margin: 0 auto;"></i> Mode Laporan</span>
+                        
+                        <div class="form-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 2rem;">
+                            <!-- Chart 1: Kunjungan & Deals -->
+                            <div class="form-section" style="background: rgba(15, 23, 42, 0.4);">
+                                <h4>Trend Visit & Deals</h4>
+                                <div style="position: relative; height: 300px; width: 100%;">
+                                    <canvas id="chart-visits"></canvas>
+                                </div>
+                            </div>
+                            
+                            <!-- Chart 2: Penjualan -->
+                            <div class="form-section" style="background: rgba(15, 23, 42, 0.4);">
+                                <h4>Trend Omset Penjualan</h4>
+                                <div style="position: relative; height: 300px; width: 100%;">
+                                    <canvas id="chart-omset"></canvas>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>
