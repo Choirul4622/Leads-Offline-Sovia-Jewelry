@@ -73,12 +73,16 @@ const SyncManager = {
                         // Success, remove from queue
                         await window.AppDB.removeFromSyncQueue(item.id);
                         
-                        // If it's a visit form, also update local visits cache
+                        // Update local cache based on action type
                         if (item.action === 'addVisit') {
                             await window.AppDB.put(window.AppDB.STORES.VISITS, {
                                 ...item.payload,
                                 id: Date.now() // temporary local ID
                             });
+                        } else if (item.action === 'saveProduct') {
+                            await window.AppDB.put(window.AppDB.STORES.PRODUCTS, item.payload);
+                        } else if (item.action === 'deleteProduct') {
+                            await window.AppDB.delete(window.AppDB.STORES.PRODUCTS, item.payload.productName);
                         }
                     } else {
                         console.error('Backend returned error for item:', item, response);
@@ -162,6 +166,13 @@ const SyncManager = {
                     await window.AppDB.clear(window.AppDB.STORES.STORE_TARGETS);
                     for (const store of data.stores) {
                         await window.AppDB.put(window.AppDB.STORES.STORE_TARGETS, store);
+                    }
+                }
+                // Sinkronisasi katalog produk (BARU)
+                if (data.products) {
+                    await window.AppDB.clear(window.AppDB.STORES.PRODUCTS);
+                    for (const product of data.products) {
+                        await window.AppDB.put(window.AppDB.STORES.PRODUCTS, product);
                     }
                 }
                 if (data.recentVisits) {
