@@ -4,14 +4,15 @@
  */
 
 const DB_NAME = 'StoreVisitDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Upgraded to v2: added PRODUCTS store
 
 const STORES = {
     USERS: 'users',           // Caches users for offline login
     STORE_TARGETS: 'store_targets', // Caches store targets
     VISITS: 'visits',         // Caches visit history for dashboard
     SYNC_QUEUE: 'sync_queue', // Queue for offline data to be sent
-    SESSION: 'session'        // Stores active session
+    SESSION: 'session',       // Stores active session
+    PRODUCTS: 'products'      // Stores product catalog (nama + harga per unit)
 };
 
 let db;
@@ -48,6 +49,10 @@ const initDB = () => {
             }
             if (!db.objectStoreNames.contains(STORES.SESSION)) {
                 db.createObjectStore(STORES.SESSION, { keyPath: 'id' });
+            }
+            // New in v2: Products store
+            if (!db.objectStoreNames.contains(STORES.PRODUCTS)) {
+                db.createObjectStore(STORES.PRODUCTS, { keyPath: 'productName' });
             }
         };
     });
