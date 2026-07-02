@@ -387,7 +387,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     function setupVisitTableActions() {
         document.querySelectorAll('.btn-edit-visit').forEach(btn => {
             btn.addEventListener('click', async () => {
-                const id = parseInt(btn.getAttribute('data-id'));
+                const idVal = btn.getAttribute('data-id');
+                const id = idVal.startsWith('L-') ? idVal : parseInt(idVal);
                 const visits = await window.AppDB.getAll(window.AppDB.STORES.VISITS);
                 const visit = visits.find(v => v.id === id);
                 if (!visit) return;
@@ -413,11 +414,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         document.querySelectorAll('.btn-delete-visit').forEach(btn => {
             btn.addEventListener('click', async () => {
-                const id = parseInt(btn.getAttribute('data-id'));
+                const idVal = btn.getAttribute('data-id');
+                const id = idVal.startsWith('L-') ? idVal : parseInt(idVal);
                 if (!confirm('Yakin ingin menghapus data kunjungan ini?')) return;
+                
+                // 1. Update cache (IndexedDB) immediately
                 await window.AppDB.delete(window.AppDB.STORES.VISITS, id);
+                
+                // 2. Optimistic Queue check
+                const queue = await window.AppDB.getSyncQueue();
+                let removed = false;
+                for (const item of queue) {
+                    if (item.action === 'addVisit' && item.payload && item.payload.id === id) {
+                        await window.AppDB.removeFromSyncQueue(item.id);
+                        removed = true;
+                        break;
+                    }
+                }
+                if (!removed) {
+                    await window.AppDB.addToSyncQueue('deleteVisit', { id: id });
+                }
+                
+                // 3. Update UI immediately
                 showToast('Data kunjungan dihapus', 'success');
-                loadDashboardData();
+                await loadDashboardData();
+                
+                if (window.SyncManager.isOnline) {
+                    window.SyncManager.syncNow();
+                }
             });
         });
     }
@@ -426,7 +450,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     elements.forms.editVisit.addEventListener('submit', async (e) => {
         e.preventDefault();
         showLoading();
-        const id = parseInt(document.getElementById('edit-visit-id').value);
+        const idVal = document.getElementById('edit-visit-id').value;
+        const id = idVal.startsWith('L-') ? idVal : parseInt(idVal);
         const visits = await window.AppDB.getAll(window.AppDB.STORES.VISITS);
         const original = visits.find(v => v.id === id);
         if (!original) { hideLoading(); return; }
@@ -461,11 +486,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             konversiOmset
         };
 
+        // 1. Update cache (IndexedDB) immediately
         await window.AppDB.put(window.AppDB.STORES.VISITS, updated);
+        
+        // 2. Optimistic Queue check
+        const updatedInQueue = await window.AppDB.updateSyncQueuePayload('addVisit', id, updated);
+        if (!updatedInQueue) {
+            await window.AppDB.addToSyncQueue('editVisit', updated);
+        }
+        
+        // 3. Update UI immediately
         document.getElementById('modal-edit-visit').classList.add('hidden');
         showToast('Data kunjungan berhasil diperbarui', 'success');
-        loadDashboardData();
+        await loadDashboardData();
         hideLoading();
+        
+        if (window.SyncManager.isOnline) {
+            window.SyncManager.syncNow();
+        }
     });
 
     // --- GENERATE LAPORAN ---
@@ -871,7 +909,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const produkLainnya = getProdukLainnayaData();
         const visitDate = document.getElementById('visit-date').value || getTodayDate();
 
+        const localId = 'L-' + Date.now();
+
         const data = {
+            id: localId,
             timestamp: new Date().toISOString(),
             visitDate,
             user: appState.session.username,
@@ -893,16 +934,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
 
         try {
+            // Update cache immediately
+            await window.AppDB.put(window.AppDB.STORES.VISITS, data);
+            
+            // Add to sync queue
             await window.AppDB.addToSyncQueue('addVisit', data);
             
-            if (window.SyncManager.isOnline) {
-                await window.SyncManager.syncNow();
-                showToast('Data kunjungan berhasil disimpan & disinkronisasi', 'success');
-            } else {
-                showToast('Offline: Data disimpan lokal. Akan dikirim otomatis saat online.', 'info');
-                await window.AppDB.put(window.AppDB.STORES.VISITS, { ...data, id: Date.now() });
-                loadDashboardData();
-            }
+            // Update view immediately
+            await loadDashboardData();
             
             // Reset form
             elements.forms.visit.reset();
@@ -912,6 +951,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             toggleProdukTotalGroup();
             calculateFormValues();
             updateFormTargetLabel();
+
+            if (window.SyncManager.isOnline) {
+                window.SyncManager.syncNow().then(() => {
+                    showToast('Data kunjungan berhasil disimpan & disinkronisasi', 'success');
+                }).catch(err => {
+                    console.error('Background sync failed:', err);
+                });
+            } else {
+                showToast('Offline: Data disimpan lokal. Akan dikirim otomatis saat online.', 'info');
+            }
             
         } catch (err) {
             showToast('Gagal menyimpan data kunjungan', 'error');
@@ -975,17 +1024,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         const editKey = document.getElementById('store-target-edit-key').value;
 
         const payload = { storeName, target };
-        await window.AppDB.addToSyncQueue('saveStoreTarget', payload);
+        
+        // 1. Update cache immediately
         await window.AppDB.put(window.AppDB.STORES.STORE_TARGETS, payload);
+        
+        // 2. Queue management
+        const updatedInQueue = await window.AppDB.updateSyncQueuePayload('saveStoreTarget', storeName, payload);
+        if (!updatedInQueue) {
+            await window.AppDB.addToSyncQueue('saveStoreTarget', payload);
+        }
+        
+        // 3. Update UI immediately
         await loadStoreTargets();
         loadStoreTargetsUI();
         showToast(editKey ? 'Target diperbarui' : 'Target ditambahkan', 'success');
         
-        if (window.SyncManager.isOnline) window.SyncManager.syncNow();
         elements.forms.storeTarget.reset();
         document.getElementById('store-target-edit-key').value = '';
         document.getElementById('btn-store-target-submit').textContent = 'Simpan Target';
         document.getElementById('btn-store-target-cancel').classList.add('hidden');
+
+        if (window.SyncManager.isOnline) {
+            window.SyncManager.syncNow();
+        }
     });
 
     document.getElementById('btn-store-target-cancel').addEventListener('click', () => {
@@ -1042,12 +1103,31 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.addEventListener('click', async (e) => {
                 const sName = e.currentTarget.getAttribute('data-store');
                 if(confirm(`Yakin ingin menghapus target untuk ${sName}?`)) {
-                    await window.AppDB.addToSyncQueue('deleteStoreTarget', { storeName: sName });
+                    // 1. Update cache immediately
                     await window.AppDB.delete(window.AppDB.STORES.STORE_TARGETS, sName);
+                    
+                    // 2. Queue management
+                    const queue = await window.AppDB.getSyncQueue();
+                    let removed = false;
+                    for (const item of queue) {
+                        if (item.action === 'saveStoreTarget' && item.payload && item.payload.storeName === sName) {
+                            await window.AppDB.removeFromSyncQueue(item.id);
+                            removed = true;
+                            break;
+                        }
+                    }
+                    if (!removed) {
+                        await window.AppDB.addToSyncQueue('deleteStoreTarget', { storeName: sName });
+                    }
+                    
+                    // 3. Update UI immediately
                     await loadStoreTargets();
                     loadStoreTargetsUI();
-                    if (window.SyncManager.isOnline) window.SyncManager.syncNow();
                     showToast(`Target ${sName} dihapus`, 'success');
+
+                    if (window.SyncManager.isOnline) {
+                        window.SyncManager.syncNow();
+                    }
                 }
             });
         });
@@ -1069,7 +1149,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         const editKey = document.getElementById('product-edit-key').value;
 
         const payload = { productName, pricePerUnit };
+        
+        // 1. Update cache immediately
         await window.AppDB.put(window.AppDB.STORES.PRODUCTS, payload);
+        
+        // 2. Queue management
+        const updatedInQueue = await window.AppDB.updateSyncQueuePayload('saveProduct', productName, payload);
+        if (!updatedInQueue) {
+            await window.AppDB.addToSyncQueue('saveProduct', payload);
+        }
+        
+        // 3. Update UI immediately
         await loadProducts();
         loadProductsUI();
         showToast(editKey ? 'Produk diperbarui' : 'Produk berhasil disimpan', 'success');
@@ -1080,6 +1170,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         submitBtn.innerHTML = '<i data-lucide="plus"></i> Simpan Produk';
         document.getElementById('btn-product-cancel').classList.add('hidden');
         if (window.lucide) lucide.createIcons();
+
+        if (window.SyncManager.isOnline) {
+            window.SyncManager.syncNow();
+        }
     });
 
     document.getElementById('btn-product-cancel').addEventListener('click', () => {
@@ -1137,10 +1231,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.addEventListener('click', async () => {
                 const name = btn.getAttribute('data-name');
                 if (!confirm(`Yakin ingin menghapus produk "${name}"?`)) return;
+                
+                // 1. Update cache immediately
                 await window.AppDB.delete(window.AppDB.STORES.PRODUCTS, name);
+                
+                // 2. Queue management
+                const queue = await window.AppDB.getSyncQueue();
+                let removed = false;
+                for (const item of queue) {
+                    if (item.action === 'saveProduct' && item.payload && item.payload.productName === name) {
+                        await window.AppDB.removeFromSyncQueue(item.id);
+                        removed = true;
+                        break;
+                    }
+                }
+                if (!removed) {
+                    await window.AppDB.addToSyncQueue('deleteProduct', { productName: name });
+                }
+                
+                // 3. Update UI immediately
                 await loadProducts();
                 loadProductsUI();
                 showToast(`Produk "${name}" dihapus`, 'success');
+
+                if (window.SyncManager.isOnline) {
+                    window.SyncManager.syncNow();
+                }
             });
         });
     }
@@ -1156,16 +1272,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         const editKey = document.getElementById('user-edit-key').value;
 
         const payload = { id: editKey ? editKey : 'U-'+Date.now(), username, password, role, storeName };
-        await window.AppDB.addToSyncQueue('saveUser', payload);
+        
+        // 1. Update cache immediately
         await window.AppDB.put(window.AppDB.STORES.USERS, payload);
+        
+        // 2. Queue management
+        const updatedInQueue = await window.AppDB.updateSyncQueuePayload('saveUser', username, payload);
+        if (!updatedInQueue) {
+            await window.AppDB.addToSyncQueue('saveUser', payload);
+        }
+        
+        // 3. Update UI immediately
         loadUsersUI();
         showToast(editKey ? 'User diperbarui' : 'User ditambahkan', 'success');
         
-        if (window.SyncManager.isOnline) window.SyncManager.syncNow();
         elements.forms.user.reset();
         document.getElementById('user-edit-key').value = '';
         document.getElementById('btn-user-submit').textContent = 'Simpan User';
         document.getElementById('btn-user-cancel').classList.add('hidden');
+
+        if (window.SyncManager.isOnline) {
+            window.SyncManager.syncNow();
+        }
     });
 
     document.getElementById('btn-user-cancel').addEventListener('click', () => {
@@ -1229,11 +1357,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return;
                 }
                 if(confirm(`Yakin ingin menghapus user ${uName}?`)) {
-                    await window.AppDB.addToSyncQueue('deleteUser', { username: uName });
+                    // 1. Update cache immediately
                     await window.AppDB.delete(window.AppDB.STORES.USERS, uName);
+                    
+                    // 2. Queue management
+                    const queue = await window.AppDB.getSyncQueue();
+                    let removed = false;
+                    for (const item of queue) {
+                        if (item.action === 'saveUser' && item.payload && item.payload.username === uName) {
+                            await window.AppDB.removeFromSyncQueue(item.id);
+                            removed = true;
+                            break;
+                        }
+                    }
+                    if (!removed) {
+                        await window.AppDB.addToSyncQueue('deleteUser', { username: uName });
+                    }
+                    
+                    // 3. Update UI immediately
                     loadUsersUI();
-                    if (window.SyncManager.isOnline) window.SyncManager.syncNow();
-                    showToast(`User ${uName} dihapus`, 'success');
+                    showToast(`User ${uName} deleted`, 'success');
+
+                    if (window.SyncManager.isOnline) {
+                        window.SyncManager.syncNow();
+                    }
                 }
             });
         });
