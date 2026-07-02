@@ -133,6 +133,32 @@ const addToSyncQueue = (action, payload) => {
 const getSyncQueue = () => getAllData(STORES.SYNC_QUEUE);
 const removeFromSyncQueue = (id) => deleteData(STORES.SYNC_QUEUE, id);
 
+const updateSyncQueuePayload = (action, keyVal, newPayload) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const queue = await getSyncQueue();
+            for (const item of queue) {
+                if (item.action === action && item.payload) {
+                    const payload = item.payload;
+                    const match = (payload.id && payload.id.toString() === keyVal.toString()) || 
+                                  (payload.storeName && payload.storeName.toString() === keyVal.toString()) || 
+                                  (payload.productName && payload.productName.toString() === keyVal.toString()) || 
+                                  (payload.username && payload.username.toString() === keyVal.toString());
+                    if (match) {
+                        item.payload = newPayload;
+                        await putData(STORES.SYNC_QUEUE, item);
+                        resolve(true);
+                        return;
+                    }
+                }
+            }
+            resolve(false);
+        } catch (e) {
+            reject(e);
+        }
+    });
+};
+
 // Expose to global scope for use in other files
 window.AppDB = {
     init: initDB,
@@ -147,5 +173,6 @@ window.AppDB = {
     addToSyncQueue,
     getSyncQueue,
     removeFromSyncQueue,
+    updateSyncQueuePayload,
     STORES
 };
