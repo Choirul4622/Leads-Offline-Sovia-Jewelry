@@ -136,6 +136,37 @@
             <div class="panel-container">
                 <!-- Dashboard Panel -->
                 <section id="panel-dashboard" class="panel active">
+                    <!-- Filter Tanggal & Tombol Laporan -->
+                    <div class="dashboard-toolbar glass mb-4">
+                        <div class="toolbar-left">
+                            <i data-lucide="calendar-range" class="toolbar-icon"></i>
+                            <span class="toolbar-label">Filter Periode:</span>
+                            <div class="date-filter-group">
+                                <div class="date-field">
+                                    <label for="filter-date-start">Dari</label>
+                                    <input type="date" id="filter-date-start">
+                                </div>
+                                <span class="date-separator">—</span>
+                                <div class="date-field">
+                                    <label for="filter-date-end">Sampai</label>
+                                    <input type="date" id="filter-date-end">
+                                </div>
+                                <button id="btn-apply-filter" class="btn-filter">
+                                    <i data-lucide="filter"></i> Filter
+                                </button>
+                                <button id="btn-reset-filter" class="btn-filter-reset" title="Reset Filter">
+                                    <i data-lucide="x-circle"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="toolbar-right">
+                            <button id="btn-generate-report" class="btn-report">
+                                <i data-lucide="file-text"></i>
+                                <span>Laporan</span>
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="kpi-grid">
                         <div class="kpi-card glass">
                             <div class="kpi-icon blue"><i data-lucide="users"></i></div>
@@ -184,15 +215,16 @@
                             <table class="data-table">
                                 <thead>
                                     <tr>
-                                        <th>Waktu</th>
+                                        <th>Tanggal</th>
                                         <th>Store</th>
                                         <th>Visit Baru</th>
                                         <th>Total Deals</th>
                                         <th>Omset</th>
+                                        <th>Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody id="recent-visits-body">
-                                    <tr><td colspan="5" class="text-center text-muted">Belum ada data</td></tr>
+                                    <tr><td colspan="6" class="text-center text-muted">Belum ada data</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -205,6 +237,17 @@
                         <div class="form-header">
                             <h3>Input Data Kunjungan Harian</h3>
                             <p>Data akan tersimpan secara lokal jika offline, dan otomatis dikirim saat online.</p>
+                        </div>
+
+                        <!-- Tanggal Kunjungan -->
+                        <div class="visit-date-row">
+                            <div class="input-group" style="max-width: 280px;">
+                                <label for="visit-date">
+                                    <i data-lucide="calendar" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i>
+                                    Tanggal Kunjungan
+                                </label>
+                                <input type="date" id="visit-date" required>
+                            </div>
                         </div>
 
                         <div class="form-grid">
@@ -282,6 +325,27 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Group 4: Produk Lainnya -->
+                            <div class="form-section" id="section-produk-lainnya" style="grid-column: 1 / -1;">
+                                <h4>
+                                    <i data-lucide="package" style="width:16px;height:16px;"></i>
+                                    Produk Lainnya
+                                </h4>
+                                <div id="produk-rows-container">
+                                    <!-- Dynamic rows will be inserted here -->
+                                </div>
+                                <button type="button" id="btn-add-produk-row" class="btn-add-row">
+                                    <i data-lucide="plus-circle"></i>
+                                    Tambah Produk
+                                </button>
+                                <div class="calculated-group mt-4" id="produk-lainnya-total-group" style="display:none;">
+                                    <div class="calc-item">
+                                        <span class="calc-label">Total Omset Produk Lainnya</span>
+                                        <span class="calc-value highlight" id="calc-total-omset-produk">Rp 0</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="form-actions">
@@ -327,12 +391,14 @@
 
                 <!-- Validasi (Admin) Panel -->
                 <section id="panel-validasi" class="panel hidden">
-                    <div class="glass form-layout">
+                    <!-- Store Target Section -->
+                    <div class="glass form-layout mb-4">
                         <div class="section-header">
                             <h3>Pengaturan Target Store</h3>
                             <p>Konfigurasi target omzet bulanan untuk kalkulasi konversi otomatis.</p>
                         </div>
                         <form id="store-target-form" class="mt-4">
+                            <input type="hidden" id="store-target-edit-key" value="">
                             <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
                                 <div class="input-group">
                                     <label for="store-name-config">Nama Store</label>
@@ -343,7 +409,10 @@
                                     <input type="number" id="store-target-config" required placeholder="100000000">
                                 </div>
                             </div>
-                            <button type="submit" class="btn-primary mt-2">Simpan Target</button>
+                            <div style="display:flex;gap:0.75rem;align-items:center;">
+                                <button type="submit" class="btn-primary mt-2" id="btn-store-target-submit" style="width:auto;padding:0.75rem 1.5rem;">Simpan Target</button>
+                                <button type="button" class="btn-cancel mt-2 hidden" id="btn-store-target-cancel">Batal Edit</button>
+                            </div>
                         </form>
                         
                         <div class="mt-8">
@@ -369,6 +438,56 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Produk Lainnya Section -->
+                    <div class="glass form-layout">
+                        <div class="section-header">
+                            <h3>Daftar Produk Lainnya</h3>
+                            <p>Kelola katalog produk yang tersedia untuk dipilih pada form kunjungan.</p>
+                        </div>
+                        <form id="product-form" class="mt-4">
+                            <input type="hidden" id="product-edit-key" value="">
+                            <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                                <div class="input-group">
+                                    <label for="product-name-input">Nama Produk</label>
+                                    <input type="text" id="product-name-input" required placeholder="Contoh: Anting Emas">
+                                </div>
+                                <div class="input-group">
+                                    <label for="product-price-input">Harga Per Unit (Rp)</label>
+                                    <input type="number" id="product-price-input" required placeholder="500000" min="0">
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:0.75rem;align-items:center;">
+                                <button type="submit" class="btn-primary mt-2" id="btn-product-submit" style="width:auto;padding:0.75rem 1.5rem;">
+                                    <i data-lucide="plus"></i> Simpan Produk
+                                </button>
+                                <button type="button" class="btn-cancel mt-2 hidden" id="btn-product-cancel">Batal Edit</button>
+                            </div>
+                        </form>
+                        
+                        <div class="mt-8">
+                            <div class="flex-between mb-4">
+                                <h4>Daftar Produk</h4>
+                                <button id="btn-refresh-products" class="btn-icon" title="Refresh">
+                                    <i data-lucide="refresh-cw"></i>
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Nama Produk</th>
+                                            <th>Harga Per Unit</th>
+                                            <th>Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="products-list-body">
+                                        <!-- Dynamic content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 <!-- Manajemen User Panel -->
@@ -378,6 +497,7 @@
                             <h3>Manajemen User</h3>
                         </div>
                         <form id="user-form" class="mt-4">
+                            <input type="hidden" id="user-edit-key" value="">
                             <div class="form-grid">
                                 <div class="input-group">
                                     <label for="new-username">Username</label>
@@ -402,7 +522,10 @@
                                     </select>
                                 </div>
                             </div>
-                            <button type="submit" class="btn-primary mt-4">Simpan User</button>
+                            <div style="display:flex;gap:0.75rem;align-items:center;">
+                                <button type="submit" class="btn-primary mt-4" id="btn-user-submit" style="width:auto;padding:0.75rem 1.5rem;">Simpan User</button>
+                                <button type="button" class="btn-cancel mt-4 hidden" id="btn-user-cancel">Batal Edit</button>
+                            </div>
                         </form>
 
                         <div class="mt-8">
@@ -451,11 +574,12 @@
                                         <th>Waktu Input</th>
                                         <th>Tipe Data</th>
                                         <th>Detail</th>
+                                        <th>Status</th>
                                         <th>Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody id="sync-queue-body">
-                                    <tr><td colspan="4" class="text-center text-muted">Antrean kosong</td></tr>
+                                    <tr><td colspan="5" class="text-center text-muted">Antrean kosong</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -466,7 +590,75 @@
         </main>
     </div>
 
-    <!-- Modals -->
+    <!-- ===== MODALS ===== -->
+
+    <!-- Modal Edit Kunjungan -->
+    <div id="modal-edit-visit" class="modal-overlay hidden">
+        <div class="modal-box glass">
+            <div class="modal-header">
+                <h3><i data-lucide="edit-3"></i> Edit Data Kunjungan</h3>
+                <button class="btn-icon modal-close" data-modal="modal-edit-visit">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form id="edit-visit-form" class="modal-body">
+                <input type="hidden" id="edit-visit-id">
+                <div class="form-grid">
+                    <div class="input-group">
+                        <label for="edit-visit-date">Tanggal Kunjungan</label>
+                        <input type="date" id="edit-visit-date" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="edit-visit-baru">Visit Baru</label>
+                        <input type="number" id="edit-visit-baru" min="0" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="edit-deals-offline">Deals Offline</label>
+                        <input type="number" id="edit-deals-offline" min="0" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="edit-deals-referal">Deals Referal</label>
+                        <input type="number" id="edit-deals-referal" min="0" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="edit-deals-box">Deals Box</label>
+                        <input type="number" id="edit-deals-box" min="0" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="edit-visit-repair">Visit Repair</label>
+                        <input type="number" id="edit-visit-repair" min="0" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="edit-visit-buyback">Visit Buyback</label>
+                        <input type="number" id="edit-visit-buyback" min="0" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="edit-pengambilan-baru">Pengambilan Order Baru</label>
+                        <input type="number" id="edit-pengambilan-baru" min="0" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="edit-pengambilan-repair">Pengambilan Repair</label>
+                        <input type="number" id="edit-pengambilan-repair" min="0" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="edit-qty-cincin">Qty Cincin Terjual</label>
+                        <input type="number" id="edit-qty-cincin" min="0" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="edit-omset">Omset Penjualan (Rp)</label>
+                        <input type="number" id="edit-omset" min="0" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-cancel modal-close" data-modal="modal-edit-visit">Batal</button>
+                    <button type="submit" class="btn-primary" style="width:auto;padding:0.75rem 1.5rem;">
+                        <i data-lucide="save"></i> Simpan Perubahan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="overlay hidden">
         <div class="spinner"></div>
