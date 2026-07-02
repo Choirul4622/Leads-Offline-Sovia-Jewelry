@@ -75,14 +75,30 @@ const SyncManager = {
                         
                         // Update local cache based on action type
                         if (item.action === 'addVisit') {
+                            // If it has a temporary local ID, remove it
+                            if (item.payload.id && item.payload.id.toString().startsWith('L-')) {
+                                await window.AppDB.delete(window.AppDB.STORES.VISITS, item.payload.id);
+                            }
                             await window.AppDB.put(window.AppDB.STORES.VISITS, {
                                 ...item.payload,
-                                id: Date.now() // temporary local ID
+                                id: response.id || item.payload.id
                             });
+                        } else if (item.action === 'editVisit') {
+                            await window.AppDB.put(window.AppDB.STORES.VISITS, item.payload);
+                        } else if (item.action === 'deleteVisit') {
+                            await window.AppDB.delete(window.AppDB.STORES.VISITS, item.payload.id);
                         } else if (item.action === 'saveProduct') {
                             await window.AppDB.put(window.AppDB.STORES.PRODUCTS, item.payload);
                         } else if (item.action === 'deleteProduct') {
                             await window.AppDB.delete(window.AppDB.STORES.PRODUCTS, item.payload.productName);
+                        } else if (item.action === 'saveStoreTarget') {
+                            await window.AppDB.put(window.AppDB.STORES.STORE_TARGETS, item.payload);
+                        } else if (item.action === 'deleteStoreTarget') {
+                            await window.AppDB.delete(window.AppDB.STORES.STORE_TARGETS, item.payload.storeName);
+                        } else if (item.action === 'saveUser') {
+                            await window.AppDB.put(window.AppDB.STORES.USERS, item.payload);
+                        } else if (item.action === 'deleteUser') {
+                            await window.AppDB.delete(window.AppDB.STORES.USERS, item.payload.username);
                         }
                     } else {
                         console.error('Backend returned error for item:', item, response);
