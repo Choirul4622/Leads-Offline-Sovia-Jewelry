@@ -309,9 +309,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!appState.session) return;
         const visits = await window.AppDB.getAll(window.AppDB.STORES.VISITS);
         
-        let myVisits = appState.session.role === 'Admin' 
+        let myVisits = appState.session?.role === 'Admin' 
             ? visits 
-            : visits.filter(v => v.storeName === appState.session.storeName);
+            : visits.filter(v => v.storeName === appState.session?.storeName);
 
         // Apply date filter
         myVisits = filterVisitsByDate(myVisits);
@@ -327,17 +327,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        const konversiDeals = tVisit > 0 ? ((tDeals / tVisit) * 100).toFixed(1) : 0;
+        const konversiDeals = tVisit > 0 ? ((tDeals / tVisit) * 100).toFixed(1) : "0.0";
         
         let myTarget = 0;
-        if (appState.session.role === 'Admin') {
+        if (appState.session?.role === 'Admin') {
             appState.storeTargets.forEach(t => myTarget += (parseInt(t.target) || 0));
         } else {
-            const myTargetObj = appState.storeTargets.find(t => t.storeName === appState.session.storeName);
+            const myTargetObj = appState.storeTargets.find(t => t.storeName === appState.session?.storeName);
             myTarget = myTargetObj ? parseInt(myTargetObj.target) : 0;
         }
         
-        const konversiOmset = myTarget > 0 ? ((tOmset / myTarget) * 100).toFixed(1) : 0;
+        const konversiOmset = myTarget > 0 ? ((tOmset / myTarget) * 100).toFixed(1) : "0.0";
 
         document.getElementById('kpi-visit-baru').textContent = tVisit;
         document.getElementById('kpi-total-deals').textContent = tDeals;
@@ -349,7 +349,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const tbody = document.getElementById('recent-visits-body');
         tbody.innerHTML = '';
         if (myVisits.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Belum ada data kunjungan</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><i data-lucide="folder-open"></i><p>Belum ada data kunjungan pada periode ini.</p></div></td></tr>';
         } else {
             const sorted = myVisits.sort((a,b) => new Date(b.visitDate || b.timestamp || b.id) - new Date(a.visitDate || a.timestamp || a.id)).slice(0, 20);
             sorted.forEach(v => {
@@ -510,9 +510,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-generate-report').addEventListener('click', async () => {
         showLoading();
         const visits = await window.AppDB.getAll(window.AppDB.STORES.VISITS);
-        let myVisits = appState.session.role === 'Admin' 
+        let myVisits = appState.session?.role === 'Admin' 
             ? visits 
-            : visits.filter(v => v.storeName === appState.session.storeName);
+            : visits.filter(v => v.storeName === appState.session?.storeName);
         myVisits = filterVisitsByDate(myVisits);
 
         const { start, end } = appState.dashboardFilter;
@@ -527,14 +527,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         let myTarget = 0;
-        if (appState.session.role === 'Admin') {
+        if (appState.session?.role === 'Admin') {
             appState.storeTargets.forEach(t => myTarget += parseInt(t.target) || 0);
         } else {
-            const myTargetObj = appState.storeTargets.find(t => t.storeName === appState.session.storeName);
+            const myTargetObj = appState.storeTargets.find(t => t.storeName === appState.session?.storeName);
             myTarget = myTargetObj ? parseInt(myTargetObj.target) : 0;
         }
-        const konversiDeals = tVisit > 0 ? ((tDeals / tVisit) * 100).toFixed(1) : 0;
-        const konversiOmset = myTarget > 0 ? ((tOmset / myTarget) * 100).toFixed(1) : 0;
+        const konversiDeals = tVisit > 0 ? ((tDeals / tVisit) * 100).toFixed(1) : "0.0";
+        const konversiOmset = myTarget > 0 ? ((tOmset / myTarget) * 100).toFixed(1) : "0.0";
 
         const sorted = myVisits.sort((a, b) => new Date(b.visitDate || b.timestamp || b.id) - new Date(a.visitDate || a.timestamp || a.id));
 
@@ -659,7 +659,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderCharts(visits) {
         if (!window.Chart) return;
         
-        const isStore = appState.session.role === 'Store';
+        const isStore = appState.session?.role === 'Store';
         const labels = [], visitData = [], dealData = [], omsetData = [];
         
         if (isStore) {
@@ -774,8 +774,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const targetOmset = parseInt(document.getElementById('calc-target-omset').dataset.value) || 0;
 
         const totalDeals = dOffline + dReferal + dBox;
-        const konversiDeals = visitBaru > 0 ? ((totalDeals / visitBaru) * 100).toFixed(1) : 0;
-        const konversiOmset = targetOmset > 0 ? ((omset / targetOmset) * 100).toFixed(1) : 0;
+        const konversiDeals = visitBaru > 0 ? ((totalDeals / visitBaru) * 100).toFixed(1) : "0.0";
+        const konversiOmset = targetOmset > 0 ? ((omset / targetOmset) * 100).toFixed(1) : "0.0";
 
         document.getElementById('calc-total-deals').textContent = totalDeals;
         document.getElementById('calc-konversi-deals').textContent = `${konversiDeals}%`;
@@ -977,7 +977,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         tbody.innerHTML = '';
         
         if (queue.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Antrean sinkronisasi kosong</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><i data-lucide="check-circle-2"></i><p>Antrean sinkronisasi kosong. Semua data tersinkron.</p></div></td></tr>';
             return;
         }
 
@@ -1061,7 +1061,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const tbody = document.getElementById('stores-list-body');
         tbody.innerHTML = '';
         if (appState.storeTargets.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Belum ada target store</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="3"><div class="empty-state"><i data-lucide="store"></i><p>Belum ada target store.</p></div></td></tr>';
         } else {
             appState.storeTargets.forEach(t => {
                 const tr = document.createElement('tr');
@@ -1191,7 +1191,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         tbody.innerHTML = '';
         
         if (appState.products.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Belum ada produk</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="3"><div class="empty-state"><i data-lucide="package-x"></i><p>Belum ada data produk.</p></div></td></tr>';
         } else {
             appState.products.forEach(p => {
                 const tr = document.createElement('tr');
@@ -1309,7 +1309,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         tbody.innerHTML = '';
         
         if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Belum ada data user</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><i data-lucide="users"></i><p>Belum ada data user.</p></div></td></tr>';
             return;
         }
 
