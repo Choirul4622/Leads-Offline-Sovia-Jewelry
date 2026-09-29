@@ -9,6 +9,8 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycby62gS7Cqx6yI-L-BwVB-3u
 const SyncManager = {
     isOnline: navigator.onLine,
     isSyncing: false,
+    syncInterval: null,
+    syncTimeoutMs: 15000,
 
     init() {
         window.addEventListener('online', this.handleOnline.bind(this));
@@ -16,19 +18,35 @@ const SyncManager = {
         
         // Check initial state
         this.updateSyncStatusUI();
+
+        // Start background sync interval (every 60 seconds)
+        this.startBackgroundSync();
+    },
+
+    startBackgroundSync() {
+        if (this.syncInterval) clearInterval(this.syncInterval);
+        this.syncInterval = setInterval(() => {
+            if (this.isOnline && !this.isSyncing) {
+                this.processQueue();
+            }
+        }, 60000); // 60 seconds
     },
 
     handleOnline() {
         this.isOnline = true;
         this.updateSyncStatusUI();
-        window.app.showToast('Koneksi kembali. Memulai sinkronisasi...', 'info');
+        if (window.app && window.app.showToast) {
+            window.app.showToast('Koneksi kembali. Memulai sinkronisasi...', 'info');
+        }
         this.processQueue();
     },
 
     handleOffline() {
         this.isOnline = false;
         this.updateSyncStatusUI();
-        window.app.showToast('Koneksi terputus. Mode offline aktif.', 'error');
+        if (window.app && window.app.showToast) {
+            window.app.showToast('Koneksi terputus. Mode offline aktif.', 'error');
+        }
     },
 
     updateSyncStatusUI() {
@@ -133,24 +151,33 @@ const SyncManager = {
             return new Promise(resolve => setTimeout(() => resolve({ status: 'success' }), 1000));
         }
 
-        // We use POST with URLSearchParams or JSON if the backend supports it.
-        // Google Apps Script doPost receives e.parameter or e.postData.contents
-        const response = await fetch(GAS_URL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: item.action,
-                data: item.payload
-            }),
-            headers: {
-                'Content-Type': 'text/plain;charset=utf-8', // Bypass CORS preflight for GAS
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.syncTimeoutMs);
+
+        try {
+            const response = await fetch(GAS_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: item.action,
+                    data: item.payload
+                }),
+                headers: {
+                    'Content-Type': 'text/plain;charset=utf-8', 
+                },
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-        });
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            return await response.json();
+        } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
         }
-
-        return await response.json();
     },
 
     // Functions to trigger sync immediately

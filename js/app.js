@@ -883,7 +883,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         toggleProdukTotalGroup();
     }
 
-    function getProdukLainnayaData() {
+    function getProdukLainnyaData() {
         const rows = document.querySelectorAll('.produk-row');
         const result = [];
         rows.forEach(row => {
@@ -906,7 +906,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         e.preventDefault();
         showLoading();
 
-        const produkLainnya = getProdukLainnayaData();
+        const produkLainnya = getProdukLainnyaData();
         const visitDate = document.getElementById('visit-date').value || getTodayDate();
 
         const localId = 'L-' + Date.now();
