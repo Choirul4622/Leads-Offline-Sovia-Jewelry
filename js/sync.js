@@ -76,6 +76,11 @@ const SyncManager = {
         if (!this.isOnline || this.isSyncing) return;
 
         try {
+            // Jalankan mekanisme Auto-Repair (hapus antrean yatim/mandul) sebelum diproses
+            if (window.AppDB && window.AppDB.cleanupOrphanData) {
+                await window.AppDB.cleanupOrphanData();
+            }
+
             const queue = await window.AppDB.getSyncQueue();
             if (queue.length === 0) return;
 

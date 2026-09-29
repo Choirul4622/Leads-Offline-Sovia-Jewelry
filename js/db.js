@@ -159,6 +159,54 @@ const updateSyncQueuePayload = (action, keyVal, newPayload) => {
     });
 };
 
+const cleanupOrphanData = async () => {
+    try {
+        const queue = await getSyncQueue();
+        const visits = await getAllData(STORES.VISITS);
+        const products = await getAllData(STORES.PRODUCTS);
+        const storeTargets = await getAllData(STORES.STORE_TARGETS);
+        const users = await getAllData(STORES.USERS);
+
+        const visitIds = new Set(visits.map(v => v.id.toString()));
+        const productNames = new Set(products.map(p => p.productName));
+        const storeNames = new Set(storeTargets.map(s => s.storeName));
+        const usernames = new Set(users.map(u => u.username));
+
+        let removedCount = 0;
+
+        for (const item of queue) {
+            let isOrphan = false;
+            // Jika ada antrean edit tapi data aslinya sudah tidak ada di lokal (yatim/mandul)
+            if (item.action === 'editVisit' && item.payload && item.payload.id) {
+                if (!visitIds.has(item.payload.id.toString())) isOrphan = true;
+            } else if (item.action === 'saveProduct' && item.payload && item.payload.productName) {
+                if (!productNames.has(item.payload.productName)) isOrphan = true;
+            } else if (item.action === 'saveStoreTarget' && item.payload && item.payload.storeName) {
+                if (!storeNames.has(item.payload.storeName)) isOrphan = true;
+            } else if (item.action === 'saveUser' && item.payload && item.payload.username) {
+                if (!usernames.has(item.payload.username)) isOrphan = true;
+            }
+
+            // Hapus juga antrean yang tidak punya payload (corrupted/mandul)
+            if (!item.payload || typeof item.payload !== 'object') {
+                isOrphan = true;
+            }
+
+            if (isOrphan) {
+                console.warn(`[Auto-Repair] Membuang antrean yatim/rusak: ${item.action}`, item);
+                await removeFromSyncQueue(item.id);
+                removedCount++;
+            }
+        }
+        
+        if (removedCount > 0) {
+            console.log(`[Auto-Repair] Selesai membersihkan ${removedCount} data yatim/mandul.`);
+        }
+    } catch (e) {
+        console.error('[Auto-Repair] Gagal membersihkan data yatim:', e);
+    }
+};
+
 // Expose to global scope for use in other files
 window.AppDB = {
     init: initDB,
@@ -174,5 +222,6 @@ window.AppDB = {
     getSyncQueue,
     removeFromSyncQueue,
     updateSyncQueuePayload,
+    cleanupOrphanData,
     STORES
 };
