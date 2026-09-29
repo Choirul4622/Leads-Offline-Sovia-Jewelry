@@ -128,7 +128,9 @@ const SyncManager = {
                             console.warn(`Aksi '${item.action}' dilewati karena: ${response.message}. Menghapus dari antrean...`);
                             await window.AppDB.removeFromSyncQueue(item.id);
                         } else {
-                            break; // Berhenti memproses antrean jika error bersifat sistem/network
+                            // Jangan gunakan 'break' agar item yang error tidak memblokir item lain di antrean.
+                            // Kita gunakan 'continue' agar lanjut ke item berikutnya. Item ini akan dicoba lagi nanti.
+                            continue; 
                         }
                     }
                 } catch (error) {
