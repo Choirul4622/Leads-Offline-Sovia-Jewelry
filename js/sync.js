@@ -122,14 +122,14 @@ const SyncManager = {
                         const errMsg = response ? (response.message || response.error || JSON.stringify(response)) : 'Unknown';
                         console.error(`Backend error for action '${item.action}':`, errMsg, 'Item:', item);
                         
-                        // Jika error dari backend adalah 'Unknown action', kemungkinan versi script GAS belum di-update.
-                        // Hapus dari antrean agar tidak nyangkut selamanya, atau biarkan agar bisa dicoba lagi setelah GAS diupdate.
-                        if (response && response.message === 'Unknown action') {
-                            console.warn(`Aksi '${item.action}' tidak dikenali oleh backend. Pastikan Anda telah meng-update dan mendeploy ulang script code.gs terbaru di Google Apps Script.`);
-                            // Uncomment baris di bawah jika ingin membuang antrean yang tidak didukung
-                            // await window.AppDB.removeFromSyncQueue(item.id);
+                        // Jika error dari backend adalah 'Unknown action' atau data tidak ditemukan ('not found'),
+                        // Hapus dari antrean agar tidak menyumbat queue selamanya.
+                        if (response && (response.message === 'Unknown action' || (response.message && response.message.toLowerCase().includes('not found')))) {
+                            console.warn(`Aksi '${item.action}' dilewati karena: ${response.message}. Menghapus dari antrean...`);
+                            await window.AppDB.removeFromSyncQueue(item.id);
+                        } else {
+                            break; // Berhenti memproses antrean jika error bersifat sistem/network
                         }
-                        break; 
                     }
                 } catch (error) {
                     console.error('Network/Fetch error syncing item:', item, error);
