@@ -489,9 +489,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 1. Update cache (IndexedDB) immediately
         await window.AppDB.put(window.AppDB.STORES.VISITS, updated);
         
-        // 2. Optimistic Queue check
-        const updatedInQueue = await window.AppDB.updateSyncQueuePayload('addVisit', id, updated);
+        // 2. Optimistic Queue check (gabungkan antrean jika diedit berkali-kali saat offline)
+        let updatedInQueue = await window.AppDB.updateSyncQueuePayload('addVisit', id, updated);
         if (!updatedInQueue) {
+            // Jika sebelumnya sudah ada antrean editVisit, timpa saja payload-nya agar tidak dobel
+            updatedInQueue = await window.AppDB.updateSyncQueuePayload('editVisit', id, updated);
+        }
+        if (!updatedInQueue) {
+            // Jika tidak ada antrean sama sekali, buat antrean editVisit baru
             await window.AppDB.addToSyncQueue('editVisit', updated);
         }
         
