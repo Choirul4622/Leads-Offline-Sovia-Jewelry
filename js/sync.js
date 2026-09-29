@@ -119,9 +119,16 @@ const SyncManager = {
                             await window.AppDB.delete(window.AppDB.STORES.USERS, item.payload.username);
                         }
                     } else {
-                        console.error('Backend returned error for item:', item, response);
-                        // Stop processing queue on backend logic error to prevent cascading issues,
-                        // unless it's a specific error we can ignore.
+                        const errMsg = response ? (response.message || response.error || JSON.stringify(response)) : 'Unknown';
+                        console.error(`Backend error for action '${item.action}':`, errMsg, 'Item:', item);
+                        
+                        // Jika error dari backend adalah 'Unknown action', kemungkinan versi script GAS belum di-update.
+                        // Hapus dari antrean agar tidak nyangkut selamanya, atau biarkan agar bisa dicoba lagi setelah GAS diupdate.
+                        if (response && response.message === 'Unknown action') {
+                            console.warn(`Aksi '${item.action}' tidak dikenali oleh backend. Pastikan Anda telah meng-update dan mendeploy ulang script code.gs terbaru di Google Apps Script.`);
+                            // Uncomment baris di bawah jika ingin membuang antrean yang tidak didukung
+                            // await window.AppDB.removeFromSyncQueue(item.id);
+                        }
                         break; 
                     }
                 } catch (error) {
